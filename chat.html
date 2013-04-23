@@ -1,0 +1,150 @@
+<html>
+<head>
+	<title></title>
+
+	<script src="socket.io/socket.io.js"></script>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+
+</head>
+<body>
+
+
+<div id="chat-container" class="" style="height: 200px; width: 300px; overflow-y: scroll;">
+	<ul id="chat-window">
+
+	</ul>
+</div>
+
+<input type="text" id='chat-nickname' style="" />
+<button id="btn-join">Join</button>
+
+<input type="text" id='chat-txt-msg' class="" />
+<button id="btn-send">Send</button>
+
+<div id="msgs">
+	Connecting...
+</div>
+
+<script type="text/javascript">
+	var connected = false;
+	var nickname = "";
+
+	$(document).ready(function () {
+		//generate random name as a default
+		$('#chat-nickname').val('anon' + Math.floor((Math.random()*100)+1));
+
+		//disable chat inputs before connecting
+		disableChat();
+
+		//connect to your socket server
+	    var socket = io.connect('http://localhost:3000', { 'connect timeout': 15000 });
+	    socket.on('connect', function () {
+
+        	$('#btn-join').click(function(e){
+        		//set nickname
+        		nickname = $('#chat-nickname').val();
+        		if(nickname.length > 0) 
+        			socket.emit('login', nickname);
+        	});
+
+	        enableJoin();
+	    });
+
+	    //on socket error 
+	    socket.on('error', function(){
+	    	showMessage('can not establish connection with server.');
+	    });
+	    
+	    //retrieving 'update' event. data contains our message (data.nickname, data.message)
+	    socket.on('update', function (data) {
+			//append to chat window
+			$('#chat-window').append('<li>' + data.nickname + ": " + data.message + '</li>');
+
+			//make chat window scroll down
+			scrollchat();
+	    });
+
+	    socket.on('m', function (data) {
+	    		//show number of connected users
+			showMessage(data);
+	   	});
+
+		socket.on('logged-in', function(data) {
+			//on connect, broadcast new user joined ("nickname connected")
+			sendMessage(nickname + ' connected');
+			enableChat();
+		});
+
+    		//event for button click on send
+	    $('#btn-send').click(function(e){
+			sendChat();
+	    });
+
+
+	    //lets you send the messsage when pressing "ENTER" key on keyboard
+	    $('#chat-txt-msg').on('keyup', function(e) {
+		    if (e.which == 13 && connected) {
+		        e.preventDefault();
+		        sendChat();
+		    }
+		});
+
+
+	    //gets and sends the chat
+	    function sendChat(){
+	    		//gets the message from input box
+			var msg = $('#chat-txt-msg').val();
+			if(msg.length > 0)
+				sendMessage(msg);
+				//clears the input box
+				$('#chat-txt-msg').val('');
+			}
+
+			function sendMessage(msg){
+			if(msg.length > 0){
+				//sends chat message to socket server
+				socket.emit('message', msg);
+			}
+	    }
+	});
+
+	//helper methods to enable/disable ui components.
+	function enableJoin(){
+		$('#btn-join').removeAttr('disabled');
+		$('#chat-nickname').removeAttr('disabled');
+	}
+
+	function disableChat(){
+		connected = false;
+		$('#btn-join').attr('disabled','disabled');
+		$('#chat-nickname').attr('disabled','disabled');
+
+		$('#btn-send').attr('disabled','disabled').hide();
+		$('#chat-txt-msg').attr('disabled','disabled').hide();
+	}
+
+	function enableChat(){
+		connected = true;
+		$('#chat-txt-msg').show();
+		$('#btn-send').show();
+
+		$('#btn-join').hide();
+		$('#chat-nickname').hide();		
+		$('#btn-send').removeAttr('disabled');
+		$('#chat-txt-msg').removeAttr('disabled');
+	}
+
+	//shows the system messages that appear below the chat
+    function showMessage(str){
+		$('#msgs').html(str + '<br />');
+    }
+
+	//scrolls chat window to the bottom, usually called when there is a new message
+   	function scrollchat(){
+   		$('#chat-container').stop().animate({ scrollTop: $("#chat-container")[0].scrollHeight }, 800);
+   	}
+
+</script>
+</body>
+</html>
+
